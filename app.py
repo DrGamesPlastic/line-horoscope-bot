@@ -15,12 +15,14 @@ from linebot.v3.messaging import (
     Configuration, ApiClient, MessagingApi,
     ReplyMessageRequest, TextMessage
 )
-from daily import get_daily_horoscope
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+
+# ─── Import Logics (เพิ่มบรรทัด daily ตรงนี้) ───
 from horoscope import format_horoscope, parse_date
 from tarot import get_tarot_reading
 from love import format_love_reading
 from chinese_full import format_full_chinese_horoscope
+from daily import get_daily_horoscope  # <--- ต้องมีบรรทัดนี้ครับ!
 
 load_dotenv()
 app = Flask(__name__)
@@ -83,7 +85,6 @@ def handle_text_message(event):
         mode = "general"
         clean_date = raw_text
 
-        # เพิ่มเงื่อนไข "ดวง" หรือ "today" เข้าไป
         if raw_text.startswith("ดวง") or user_text_lower.startswith("today"):
             mode = "daily"
             clean_date = raw_text.replace("ดวง", "").replace("today", "").replace("Today", "").strip()
@@ -103,7 +104,6 @@ def handle_text_message(event):
 
         if birth_date:
             if mode == "daily":
-                # เรียกฟังก์ชันดวงรายวัน (ต้องมีไฟล์ daily.py หรือฟังก์ชันนี้ก่อนนะครับ)
                 response = get_daily_horoscope(birth_date)
             elif mode == "tarot":
                 response = get_tarot_reading(birth_date)
