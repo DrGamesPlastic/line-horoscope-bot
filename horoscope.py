@@ -2,7 +2,7 @@
 🔮 โหราศาสตร์ไทย + นักษัตรจีน
 ดูดวงจากวันเดือนปีเกิด
 """
-
+import random 
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
