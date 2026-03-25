@@ -185,4 +185,4 @@ def send_reply(reply_token: str, text: str):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     print(f"🔮 บอทดูดวงเริ่มทำงานที่ port {port}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
