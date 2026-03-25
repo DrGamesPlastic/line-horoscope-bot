@@ -3,8 +3,8 @@
 ดูดวงจากวันเดือนปีเกิด
 """
 
-import random
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
 
 # ─── ราศีไทย (12 ราศี) ───
