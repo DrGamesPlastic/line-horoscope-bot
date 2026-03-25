@@ -15,6 +15,7 @@ from linebot.v3.messaging import (
     Configuration, ApiClient, MessagingApi,
     ReplyMessageRequest, TextMessage
 )
+from daily import get_daily_horoscope
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from horoscope import format_horoscope, parse_date
 from tarot import get_tarot_reading
