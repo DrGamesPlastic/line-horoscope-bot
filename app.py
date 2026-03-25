@@ -105,6 +105,7 @@ def handle_text_message(event):
         # ── คำสั่งไพ่ทาโรต์ ──
         if user_text.startswith("ไพ่") or user_text.lower().startswith("tarot"):
             date_text = user_text.replace("ไพ่", "").replace("tarot", "").strip()
+            print(f"DEBUG: date_text after replace is '{date_text}'")
             birth_date = parse_date(date_text)
             if birth_date:
                 reading = get_tarot_reading(birth_date)
