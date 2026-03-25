@@ -22,99 +22,80 @@ from love import format_love_reading
 from chinese_full import format_full_chinese_horoscope
 
 load_dotenv()
-
 app = Flask(__name__)
 
 # ─── LINE Config ───
 CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
-print(f"🔑 Channel Secret: {CHANNEL_SECRET[:8]}...")
-print(f"🔑 Access Token: {CHANNEL_ACCESS_TOKEN[:20]}...")
-
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-
-# ─── Webhook Endpoint ───
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
-    
-    print(f"📩 ได้รับ webhook: {body[:200]}...")
-    
     try:
         handler.handle(body, signature)
-        print("✅ Handler handle สำเร็จ")
     except InvalidSignatureError:
-        print("❌ Invalid Signature!")
         return jsonify({"error": "Invalid signature"}), 400
     except Exception as e:
-        print(f"❌ Handler error: {e}")
         traceback.print_exc()
-        # ยัง return 200 เพื่อไม่ให้ LINE retry
         return "OK", 200
-    
     return "OK", 200
 
-
-# ─── Health Check ───
 @app.route("/", methods=["GET"])
 def health():
     return "🔮 บอทดูดวงกำลังทำงานอยู่!"
 
-
-# ─── Debug: log all events ───
 @handler.add(MessageEvent)
 def handle_all_events(event):
-    print(f"📨 Event received: type={event.type}, message_type={getattr(event.message, 'type', 'N/A')}")
+    if hasattr(event, 'message'):
+        print(f"📨 Event: {event.type}, Msg: {getattr(event.message, 'type', 'N/A')}")
 
-
+# ─── Message Handler (แก้ไขจุดที่ซ้ำซ้อน) ───
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text_message(event):
-    # 1. ทำความสะอาดข้อความเบื้องต้น
     raw_text = event.message.text.strip()
-    user_text = raw_text.lower() # ใช้ตัวพิมพ์เล็กเพื่อเช็ก keyword ภาษาอังกฤษ
+    user_text = raw_text.lower()
     
-    print(f"📩 Received: '{raw_text}' from {event.source.user_id}")
+    print(f"📩 ได้รับข้อความ: '{raw_text}'")
     
     try:
-        # --- [A] เช็กคำสั่งช่วยเหลือ ---
+        # 1. เช็กคำสั่งช่วยเหลือ
         if raw_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
             reply = (
-                "🔮 วิธีใช้บอทดูดวง หมอเกมส์ x น้องกุ้ง\n"
+                "🔮 วิธีใช้บอทดูดวง หมอเกมส์ x น้องกุ้ง!\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "📝 พิมพ์ 'วันเกิด' เพื่อดูดวงราศี\n"
-                "   (เช่น: 25/12/2535)\n\n"
+                "🌟 เริ่มต้นใช้งานง่ายๆ เพียงพิมพ์ 'วันเกิด' ของคุณ\n"
+                "เช่น: 25/12/2535 หรือ 10-05-1990\n\n"
+                "✨ เมนูคำสั่งพิเศษ (พิมพ์คีย์เวิร์ด + วันเกิด):\n"
                 "🃏 พิมพ์ 'ไพ่' + วันเกิด -> ดูไพ่ทาโรต์\n"
                 "💕 พิมพ์ 'รัก' + วันเกิด -> ดูดวงความรัก\n"
                 "🐉 พิมพ์ 'จีน' + วันเกิด -> ดูดวงจีนเต็ม\n"
-                "━━━━━━━━━━━━━━━━━━━━"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "👉 ลองพิมพ์วันเกิดของคุณส่งมาได้เลยครับ!"
             )
             send_reply(event.reply_token, reply)
             return
 
-        # --- [B] แยกแยะคำสั่งด้วย Keyword ---
-        # เราจะสร้างตัวแปร date_part โดยการลบ keyword ออกจากข้อความต้นฉบับ
+        # 2. แยก Mode และตัด Keyword ออกจากวันที่
+        mode = "general"
         date_part = raw_text
-        mode = "general" # โหมดปกติ
 
-        if "ไพ่" in raw_text or "tarot" in user_text:
-            date_part = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+        if raw_text.startswith("ไพ่") or user_text.startswith("tarot"):
             mode = "tarot"
-        elif "รัก" in raw_text or "love" in user_text:
-            date_part = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
+            date_part = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+        elif raw_text.startswith("รัก") or user_text.startswith("love"):
             mode = "love"
-        elif "จีน" in raw_text or "chinese" in user_text:
-            date_part = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
+            date_part = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
+        elif raw_text.startswith("จีน") or user_text.startswith("chinese"):
             mode = "chinese"
+            date_part = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
 
-        # --- [C] ประมวลผลวันที่ ---
-        # ใช้ date_part ที่ตัดคำนำหน้าออกแล้วไปเข้า parse_date
+        # 3. ประมวลผลวันที่
         birth_date = parse_date(date_part)
-        
-        print(f"🔍 Mode: {mode} | Date Part: '{date_part}' | Parsed: {birth_date}")
+        print(f"🔍 Debug: Mode={mode}, DatePart='{date_part}', Parsed={birth_date}")
 
         if birth_date:
             if mode == "tarot":
@@ -125,114 +106,21 @@ def handle_text_message(event):
                 response = format_full_chinese_horoscope(birth_date)
             else:
                 response = format_horoscope(birth_date)
-            
             send_reply(event.reply_token, response)
-        
         else:
-            # ถ้ามีคำนำหน้าแต่ parse วันที่ไม่ได้ ให้บอกวิธีที่ถูกต้อง
+            # กรณีที่มี Mode แต่แปลงวันที่ไม่สำเร็จ
             if mode != "general":
-                msg = f"❌ อ่านวันที่ '{date_part}' ไม่สำเร็จ\nกรุณาพิมพ์ในรูปแบบ: {mode} 25/12/2535"
-                send_reply(event.reply_token, msg)
+                send_reply(event.reply_token, f"❌ อ่านวันที่ '{date_part}' ไม่สำเร็จ\nกรุณาพิมพ์ เช่น: {mode} 10/06/1973")
             else:
-                # ถ้าพิมพ์อย่างอื่นมาที่ไม่ใช่วันที่
-                reply = "🤔 ไม่เข้าใจคำสั่งครับ\nลองพิมพ์วันเกิดของคุณ เช่น 25/12/2535\nหรือพิมพ์ 'วิธีใช้' เพื่อดูเมนูครับ"
+                # กรณีพิมพ์ข้อความทั่วไปที่แปลงเป็นวันที่ไม่ได้
+                reply = "🤔 ไม่เข้าใจรูปแบบวันเกิดครับ\nลองส่งแบบ 25/12/2538 หรือพิมพ์ 'วิธีใช้'"
                 send_reply(event.reply_token, reply)
 
     except Exception as e:
-        print(f"❌ Error in handle_message: {e}")
+        print(f"❌ ERROR: {e}")
         traceback.print_exc()
-    
-    try:
-        # ── คำสั่งพิเศษ ──
-        if user_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
-            reply = (
-                if user_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
-            reply = (
-                "🔮 ยินดีต้อนรับสู่บอทดูดวง หมอเกมส์ x น้องกุ้ง!\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌟 เริ่มต้นใช้งานง่ายๆ เพียงพิมพ์ 'วันเกิด' ของคุณ\n"
-                "เช่น: 25/12/2535 หรือ 10-05-1990\n\n"
-                "✨ เมนูคำสั่งพิเศษ (พิมพ์คีย์เวิร์ด + วันเกิด):\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🃏 พิมพ์ 'ไพ่' ตามด้วยวันเกิด -> เพื่อเปิดไพ่ทาโรต์\n"
-                "   (ตัวอย่าง: ไพ่ 25/12/2535)\n\n"
-                "💕 พิมพ์ 'รัก' ตามด้วยวันเกิด -> เพื่อดูดวงความรัก\n"
-                "   (ตัวอย่าง: รัก 25/12/2535)\n\n"
-                "🐉 พิมพ์ 'จีน' ตามด้วยวันเกิด -> เพื่อดูดวงจีนแบบเต็ม\n"
-                "   (ตัวอย่าง: จีน 25/12/2535)\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "👉 ลองพิมพ์วันเกิดของคุณส่งมาได้เลยครับ!"
-            )
-            send_reply(event.reply_token, reply)
-            return
-            )
-        
-        # ── คำสั่งไพ่ทาโรต์ ──
-        if user_text.startswith("ไพ่") or user_text.lower().startswith("tarot"):
-            date_text = user_text.replace("ไพ่", "").replace("tarot", "").strip()
-            print(f"DEBUG: date_text after replace is '{date_text}'")
-            birth_date = parse_date(date_text)
-            if birth_date:
-                reading = get_tarot_reading(birth_date)
-                send_reply(event.reply_token, reading)
-            else:
-                send_reply(event.reply_token, 
-                    "🃏 ส่งวันเกิดมาด้วยครับ เช่น:\n"
-                    "   • ไพ่ 25/12/2538\n"
-                    "   • tarot 15-03-1990")
-            return
-        
-        # ── คำสั่งดูดวงความรัก ──
-        if user_text.startswith("รัก") or user_text.lower().startswith("love"):
-            date_text = user_text.replace("รัก", "").replace("love", "").strip()
-            birth_date = parse_date(date_text)
-            if birth_date:
-                reading = format_love_reading(birth_date)
-                send_reply(event.reply_token, reading)
-            else:
-                send_reply(event.reply_token,
-                    "💕 ส่งวันเกิดมาด้วยครับ เช่น:\n"
-                    "   • รัก 25/12/2538\n"
-                    "   • love 15-03-1990")
-            return
-        
-        # ── คำสั่งดูดวงจีนเต็ม ──
-        if user_text.startswith("จีน") or user_text.lower().startswith("chinese"):
-            date_text = user_text[2:].strip() if user_text.startswith("จีน") else user_text[7:].strip()
-            birth_date = parse_date(date_text)
-            if birth_date:
-                reading = format_full_chinese_horoscope(birth_date)
-                send_reply(event.reply_token, reading)
-            else:
-                send_reply(event.reply_token,
-                    "🐉 ส่งวันเกิดมาด้วยครับ เช่น:\n"
-                    "   • จีน 25/12/2538\n"
-                    "   • chinese 15-03-1990")
-            return
-        
-        # ── ดูดวงทั่วไป (จากวันเกิด) ──
-        birth_date = parse_date(user_text)
-        print(f"📅 แปลงวันเกิด: {user_text} → {birth_date}")
-        
-        if birth_date:
-            horoscope = format_horoscope(birth_date)
-            send_reply(event.reply_token, horoscope)
-        else:
-            reply = (
-                "🤔 ไม่เข้าใจรูปแบบวันเกิดครับ\n\n"
-                "📝 กรุณาส่งในรูปแบบ:\n"
-                "   • วัน/เดือน/ปี เช่น 25/12/2538\n"
-                "   • วัน-เดือน-ปี เช่น 15-03-1990\n\n"
-                "💡 หรือพิมพ์ 'ช่วยเหลือ' เพื่อดูวิธีใช้"
-            )
-            send_reply(event.reply_token, reply)
-    except Exception as e:
-        print(f"❌ ERROR ใน handle_message: {e}")
-        traceback.print_exc()
-
 
 def send_reply(reply_token: str, text: str):
-    """ส่งข้อความตอบกลับ"""
     try:
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
@@ -242,17 +130,10 @@ def send_reply(reply_token: str, text: str):
                     messages=[TextMessage(text=text)]
                 )
             )
-        print(f"✅ ส่ง reply สำเร็จ!")
-    except ApiException as e:
-        print(f"❌ LINE API Error: {e.status} - {e.reason}")
-        traceback.print_exc()
+        print("✅ ส่ง reply สำเร็จ!")
     except Exception as e:
-        print(f"❌ ERROR ส่ง reply: {e}")
-        traceback.print_exc()
+        print(f"❌ Error ส่ง reply: {e}")
 
-
-# ─── Run Server ───
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    print(f"🔮 บอทดูดวงเริ่มทำงานที่ port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
