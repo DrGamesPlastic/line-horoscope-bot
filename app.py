@@ -53,52 +53,58 @@ def handle_all_events(event):
     if hasattr(event, 'message'):
         print(f"📨 Event: {event.type}, Msg: {getattr(event.message, 'type', 'N/A')}")
 
-# ─── Message Handler (แก้ไขจุดที่ซ้ำซ้อน) ───
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text_message(event):
     raw_text = event.message.text.strip()
-    user_text = raw_text.lower()
+    user_text_lower = raw_text.lower()
     
     print(f"📩 ได้รับข้อความ: '{raw_text}'")
     
     try:
         # 1. เช็กคำสั่งช่วยเหลือ
-        if raw_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
+        if user_text_lower in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
             reply = (
                 "🔮 วิธีใช้บอทดูดวง หมอเกมส์ x น้องกุ้ง!\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌟 เริ่มต้นใช้งานง่ายๆ เพียงพิมพ์ 'วันเกิด' ของคุณ\n"
-                "เช่น: 25/12/2535 หรือ 10-05-1990\n\n"
+                "🌟 พิมพ์ 'วันเกิด' เพื่อดูดวงราศี\n"
+                "   (เช่น: 25/12/2535)\n\n"
                 "✨ เมนูคำสั่งพิเศษ (พิมพ์คีย์เวิร์ด + วันเกิด):\n"
-                "🃏 พิมพ์ 'ไพ่' + วันเกิด -> ดูไพ่ทาโรต์\n"
-                "💕 พิมพ์ 'รัก' + วันเกิด -> ดูดวงความรัก\n"
-                "🐉 พิมพ์ 'จีน' + วันเกิด -> ดูดวงจีนเต็ม\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "👉 ลองพิมพ์วันเกิดของคุณส่งมาได้เลยครับ!"
+                "📅 'ดวง' + วันเกิด -> ดวงรายวัน (เปลี่ยนทุกวัน!)\n"
+                "🃏 'ไพ่' + วันเกิด -> เปิดไพ่ทาโรต์\n"
+                "💕 'รัก' + วันเกิด -> ดูดวงความรัก\n"
+                "🐉 'จีน' + วันเกิด -> ดูดวงจีนเต็ม\n"
+                "━━━━━━━━━━━━━━━━━━━━"
             )
             send_reply(event.reply_token, reply)
             return
 
-        # 2. แยก Mode และตัด Keyword ออกจากวันที่
+        # 2. คัดกรองหมวดหมู่ (Mode Selection)
         mode = "general"
-        date_part = raw_text
+        clean_date = raw_text
 
-        if raw_text.startswith("ไพ่") or user_text.startswith("tarot"):
+        # เพิ่มเงื่อนไข "ดวง" หรือ "today" เข้าไป
+        if raw_text.startswith("ดวง") or user_text_lower.startswith("today"):
+            mode = "daily"
+            clean_date = raw_text.replace("ดวง", "").replace("today", "").replace("Today", "").strip()
+        elif raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
             mode = "tarot"
-            date_part = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
-        elif raw_text.startswith("รัก") or user_text.startswith("love"):
+            clean_date = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+        elif raw_text.startswith("รัก") or user_text_lower.startswith("love"):
             mode = "love"
-            date_part = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
-        elif raw_text.startswith("จีน") or user_text.startswith("chinese"):
+            clean_date = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
+        elif raw_text.startswith("จีน") or user_text_lower.startswith("chinese"):
             mode = "chinese"
-            date_part = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
+            clean_date = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
 
         # 3. ประมวลผลวันที่
-        birth_date = parse_date(date_part)
-        print(f"🔍 Debug: Mode={mode}, DatePart='{date_part}', Parsed={birth_date}")
+        birth_date = parse_date(clean_date)
+        print(f"🔍 Mode: {mode} | Date: '{clean_date}' | Parsed: {birth_date}")
 
         if birth_date:
-            if mode == "tarot":
+            if mode == "daily":
+                # เรียกฟังก์ชันดวงรายวัน (ต้องมีไฟล์ daily.py หรือฟังก์ชันนี้ก่อนนะครับ)
+                response = get_daily_horoscope(birth_date)
+            elif mode == "tarot":
                 response = get_tarot_reading(birth_date)
             elif mode == "love":
                 response = format_love_reading(birth_date)
@@ -106,18 +112,16 @@ def handle_text_message(event):
                 response = format_full_chinese_horoscope(birth_date)
             else:
                 response = format_horoscope(birth_date)
+            
             send_reply(event.reply_token, response)
         else:
-            # กรณีที่มี Mode แต่แปลงวันที่ไม่สำเร็จ
             if mode != "general":
-                send_reply(event.reply_token, f"❌ อ่านวันที่ '{date_part}' ไม่สำเร็จ\nกรุณาพิมพ์ เช่น: {mode} 10/06/1973")
+                send_reply(event.reply_token, f"❌ รูปแบบวันที่ '{clean_date}' ไม่ถูกต้องครับ\nตัวอย่าง: {mode} 10/06/1973")
             else:
-                # กรณีพิมพ์ข้อความทั่วไปที่แปลงเป็นวันที่ไม่ได้
-                reply = "🤔 ไม่เข้าใจรูปแบบวันเกิดครับ\nลองส่งแบบ 25/12/2538 หรือพิมพ์ 'วิธีใช้'"
-                send_reply(event.reply_token, reply)
+                send_reply(event.reply_token, "🤔 ไม่เข้าใจคำสั่งครับ พิมพ์ 'วิธีใช้' เพื่อดูเมนู")
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
+        print(f"❌ Error: {e}")
         traceback.print_exc()
 
 def send_reply(reply_token: str, text: str):
