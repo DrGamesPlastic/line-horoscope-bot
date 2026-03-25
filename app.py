@@ -81,26 +81,30 @@ def handle_text_message(event):
         # ── คำสั่งพิเศษ ──
         if user_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
             reply = (
-                "🔮 วิธีใช้บอทดูดวง\n"
-                "━━━━━━━━━━━━━━━━━━━━\n\n"
-                "📝 ส่งวันเกิดมาได้เลย เช่น:\n"
-                "   • 25/12/2538\n"
-                "   • 15-03-1990\n"
-                "   • 1/1/2540\n\n"
-                "✨ ฟีเจอร์ทั้งหมด:\n"
-                "   🔮 ดูดวงทั่วไป — ส่งวันเกิด\n"
-                "   🃏 ไพ่ทาโรต์ — พิมพ์ \"ไพ่\" + วันเกิด\n"
-                "   💕 ดวงความรัก — พิมพ์ \"รัก\" + วันเกิด\n"
-                "   🐉 ดวงจีนเต็ม — พิมพ์ \"จีน\" + วันเกิด\n\n"
+                if user_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
+            reply = (
+                "🔮 ยินดีต้อนรับสู่บอทดูดวง หมอเกมส์ x น้องกุ้ง!\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "🦐 สร้างโดย น้องกุ้ง"
+                "🌟 เริ่มต้นใช้งานง่ายๆ เพียงพิมพ์ 'วันเกิด' ของคุณ\n"
+                "เช่น: 25/12/2535 หรือ 10-05-1990\n\n"
+                "✨ เมนูคำสั่งพิเศษ (พิมพ์คีย์เวิร์ด + วันเกิด):\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🃏 พิมพ์ 'ไพ่' ตามด้วยวันเกิด -> เพื่อเปิดไพ่ทาโรต์\n"
+                "   (ตัวอย่าง: ไพ่ 25/12/2535)\n\n"
+                "💕 พิมพ์ 'รัก' ตามด้วยวันเกิด -> เพื่อดูดวงความรัก\n"
+                "   (ตัวอย่าง: รัก 25/12/2535)\n\n"
+                "🐉 พิมพ์ 'จีน' ตามด้วยวันเกิด -> เพื่อดูดวงจีนแบบเต็ม\n"
+                "   (ตัวอย่าง: จีน 25/12/2535)\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "👉 ลองพิมพ์วันเกิดของคุณส่งมาได้เลยครับ!"
             )
             send_reply(event.reply_token, reply)
             return
+            )
         
         # ── คำสั่งไพ่ทาโรต์ ──
         if user_text.startswith("ไพ่") or user_text.lower().startswith("tarot"):
-            date_text = user_text[2:].strip() if user_text.startswith("ไพ่") else user_text[5:].strip()
+            date_text = user_text.replace("ไพ่", "").replace("tarot", "").strip()
             birth_date = parse_date(date_text)
             if birth_date:
                 reading = get_tarot_reading(birth_date)
@@ -114,7 +118,7 @@ def handle_text_message(event):
         
         # ── คำสั่งดูดวงความรัก ──
         if user_text.startswith("รัก") or user_text.lower().startswith("love"):
-            date_text = user_text[2:].strip() if user_text.startswith("รัก") else user_text[4:].strip()
+            date_text = user_text.replace("รัก", "").replace("love", "").strip()
             birth_date = parse_date(date_text)
             if birth_date:
                 reading = format_love_reading(birth_date)
