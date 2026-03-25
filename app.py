@@ -71,11 +71,76 @@ def handle_all_events(event):
     print(f"📨 Event received: type={event.type}, message_type={getattr(event.message, 'type', 'N/A')}")
 
 
-# ─── Message Handler ───
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text_message(event):
-    user_text = event.message.text.strip()
-    print(f"📩 ได้รับข้อความ: '{user_text}' จาก {event.source.user_id}")
+    # 1. ทำความสะอาดข้อความเบื้องต้น
+    raw_text = event.message.text.strip()
+    user_text = raw_text.lower() # ใช้ตัวพิมพ์เล็กเพื่อเช็ก keyword ภาษาอังกฤษ
+    
+    print(f"📩 Received: '{raw_text}' from {event.source.user_id}")
+    
+    try:
+        # --- [A] เช็กคำสั่งช่วยเหลือ ---
+        if raw_text in ["/help", "ช่วยเหลือ", "help", "วิธีใช้"]:
+            reply = (
+                "🔮 วิธีใช้บอทดูดวง หมอเกมส์ x น้องกุ้ง\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📝 พิมพ์ 'วันเกิด' เพื่อดูดวงราศี\n"
+                "   (เช่น: 25/12/2535)\n\n"
+                "🃏 พิมพ์ 'ไพ่' + วันเกิด -> ดูไพ่ทาโรต์\n"
+                "💕 พิมพ์ 'รัก' + วันเกิด -> ดูดวงความรัก\n"
+                "🐉 พิมพ์ 'จีน' + วันเกิด -> ดูดวงจีนเต็ม\n"
+                "━━━━━━━━━━━━━━━━━━━━"
+            )
+            send_reply(event.reply_token, reply)
+            return
+
+        # --- [B] แยกแยะคำสั่งด้วย Keyword ---
+        # เราจะสร้างตัวแปร date_part โดยการลบ keyword ออกจากข้อความต้นฉบับ
+        date_part = raw_text
+        mode = "general" # โหมดปกติ
+
+        if "ไพ่" in raw_text or "tarot" in user_text:
+            date_part = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+            mode = "tarot"
+        elif "รัก" in raw_text or "love" in user_text:
+            date_part = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
+            mode = "love"
+        elif "จีน" in raw_text or "chinese" in user_text:
+            date_part = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
+            mode = "chinese"
+
+        # --- [C] ประมวลผลวันที่ ---
+        # ใช้ date_part ที่ตัดคำนำหน้าออกแล้วไปเข้า parse_date
+        birth_date = parse_date(date_part)
+        
+        print(f"🔍 Mode: {mode} | Date Part: '{date_part}' | Parsed: {birth_date}")
+
+        if birth_date:
+            if mode == "tarot":
+                response = get_tarot_reading(birth_date)
+            elif mode == "love":
+                response = format_love_reading(birth_date)
+            elif mode == "chinese":
+                response = format_full_chinese_horoscope(birth_date)
+            else:
+                response = format_horoscope(birth_date)
+            
+            send_reply(event.reply_token, response)
+        
+        else:
+            # ถ้ามีคำนำหน้าแต่ parse วันที่ไม่ได้ ให้บอกวิธีที่ถูกต้อง
+            if mode != "general":
+                msg = f"❌ อ่านวันที่ '{date_part}' ไม่สำเร็จ\nกรุณาพิมพ์ในรูปแบบ: {mode} 25/12/2535"
+                send_reply(event.reply_token, msg)
+            else:
+                # ถ้าพิมพ์อย่างอื่นมาที่ไม่ใช่วันที่
+                reply = "🤔 ไม่เข้าใจคำสั่งครับ\nลองพิมพ์วันเกิดของคุณ เช่น 25/12/2535\nหรือพิมพ์ 'วิธีใช้' เพื่อดูเมนูครับ"
+                send_reply(event.reply_token, reply)
+
+    except Exception as e:
+        print(f"❌ Error in handle_message: {e}")
+        traceback.print_exc()
     
     try:
         # ── คำสั่งพิเศษ ──
