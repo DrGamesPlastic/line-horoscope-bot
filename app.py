@@ -17,6 +17,9 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from horoscope import format_horoscope, parse_date
+from tarot import get_tarot_reading
+from love import format_love_reading
+from chinese_full import format_full_chinese_horoscope
 
 load_dotenv()
 
@@ -84,19 +87,60 @@ def handle_text_message(event):
                 "   • 25/12/2538\n"
                 "   • 15-03-1990\n"
                 "   • 1/1/2540\n\n"
-                "✨ บอทจะดูให้:\n"
-                "   🔮 ราศี + ลักษณะนิสัย\n"
-                "   🐲 นักษัตรจีน\n"
-                "   🍀 เลขนำโชค\n"
-                "   🎨 สีมงคล\n"
-                "   📊 ดวงประจำวัน\n\n"
+                "✨ ฟีเจอร์ทั้งหมด:\n"
+                "   🔮 ดูดวงทั่วไป — ส่งวันเกิด\n"
+                "   🃏 ไพ่ทาโรต์ — พิมพ์ \"ไพ่\" + วันเกิด\n"
+                "   💕 ดวงความรัก — พิมพ์ \"รัก\" + วันเกิด\n"
+                "   🐉 ดวงจีนเต็ม — พิมพ์ \"จีน\" + วันเกิด\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "🦐 สร้างโดย น้องกุ้ง"
             )
             send_reply(event.reply_token, reply)
             return
         
-        # ── ลองแปลงวันเกิด ──
+        # ── คำสั่งไพ่ทาโรต์ ──
+        if user_text.startswith("ไพ่") or user_text.lower().startswith("tarot"):
+            date_text = user_text[2:].strip() if user_text.startswith("ไพ่") else user_text[5:].strip()
+            birth_date = parse_date(date_text)
+            if birth_date:
+                reading = get_tarot_reading(birth_date)
+                send_reply(event.reply_token, reading)
+            else:
+                send_reply(event.reply_token, 
+                    "🃏 ส่งวันเกิดมาด้วยครับ เช่น:\n"
+                    "   • ไพ่ 25/12/2538\n"
+                    "   • tarot 15-03-1990")
+            return
+        
+        # ── คำสั่งดูดวงความรัก ──
+        if user_text.startswith("รัก") or user_text.lower().startswith("love"):
+            date_text = user_text[2:].strip() if user_text.startswith("รัก") else user_text[4:].strip()
+            birth_date = parse_date(date_text)
+            if birth_date:
+                reading = format_love_reading(birth_date)
+                send_reply(event.reply_token, reading)
+            else:
+                send_reply(event.reply_token,
+                    "💕 ส่งวันเกิดมาด้วยครับ เช่น:\n"
+                    "   • รัก 25/12/2538\n"
+                    "   • love 15-03-1990")
+            return
+        
+        # ── คำสั่งดูดวงจีนเต็ม ──
+        if user_text.startswith("จีน") or user_text.lower().startswith("chinese"):
+            date_text = user_text[2:].strip() if user_text.startswith("จีน") else user_text[7:].strip()
+            birth_date = parse_date(date_text)
+            if birth_date:
+                reading = format_full_chinese_horoscope(birth_date)
+                send_reply(event.reply_token, reading)
+            else:
+                send_reply(event.reply_token,
+                    "🐉 ส่งวันเกิดมาด้วยครับ เช่น:\n"
+                    "   • จีน 25/12/2538\n"
+                    "   • chinese 15-03-1990")
+            return
+        
+        # ── ดูดวงทั่วไป (จากวันเกิด) ──
         birth_date = parse_date(user_text)
         print(f"📅 แปลงวันเกิด: {user_text} → {birth_date}")
         
