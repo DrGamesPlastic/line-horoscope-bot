@@ -1,6 +1,6 @@
 """
 🔮 LINE Horoscope Bot - บอทดูดวง
-หมอเกมส์  ( Upgrade)
+หมอเกมส์  (Master Tarot & Saju Edition)
 """
 
 import os
@@ -23,7 +23,7 @@ from tarot import get_tarot_reading_by_number
 from love import format_love_reading
 from chinese_full import format_full_chinese_horoscope
 from daily import get_daily_horoscope
-from saju_logic import get_saju_reading  # <--- เพิ่ม Import ตัวใหม่
+from saju_logic import get_saju_reading
 
 load_dotenv()
 app = Flask(__name__)
@@ -73,9 +73,9 @@ def handle_text_message(event):
                 "🌟 พิมพ์ 'วันเกิด' เพื่อดูดวงราศี\n"
                 "   (เช่น: 25/12/2535)\n\n"
                 "✨ เมนูคำสั่งพิเศษ (พิมพ์คีย์เวิร์ด + วันเกิด):\n"
-                "📅 'ดวง' + วันเกิด -> ดวงรายวัน (เปลี่ยนทุกวัน!)\n"
+                "📅 'ดวง' + วันเกิด -> ดวงรายวัน\n"
                 "🇰🇷 'ซาจู' + วันเกิด -> วิเคราะห์ธาตุซาจูเกาหลี\n"
-                "🃏 'ไพ่' + วันเกิด -> เปิดไพ่ทาโรต์\n"
+                "🃏 'ไพ่' -> อธิษฐานเลือกเลข 1-78\n"
                 "💕 'รัก' + วันเกิด -> ดูดวงความรัก\n"
                 "🐉 'จีน' + วันเกิด -> ดูดวงจีนเต็ม\n"
                 "━━━━━━━━━━━━━━━━━━━━"
@@ -83,21 +83,12 @@ def handle_text_message(event):
             send_reply(event.reply_token, reply)
             return
 
-        # 2. คัดกรองหมวดหมู่ (Mode Selection)
-        mode = "general"
-        clean_date = raw_text
-
-        if raw_text.startswith("ดวง") or user_text_lower.startswith("today"):
-            mode = "daily"
-            clean_date = raw_text.replace("ดวง", "").replace("today", "").replace("Today", "").strip()
-        elif raw_text.startswith("ซาจู") or user_text_lower.startswith("saju"):
-            mode = "saju"
-            clean_date = raw_text.replace("ซาจู", "").replace("saju", "").replace("Saju", "").strip()
-        elif raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
-            mode = "tarot"
-          elif raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
-            # ถ้าพิมพ์แค่ "ไพ่" ให้ส่งเมนูเลือกเลข
-            if len(raw_text) <= 4: 
+        # 2. คัดกรองโหมดพิเศษ (ที่ไม่ต้องใช้ระบบวันที่แบบปกติ)
+        
+        # --- หมวด "ไพ่ทาโรต์" ---
+        if raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
+            num_part = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+            if not num_part:  # พิมพ์แค่ "ไพ่"
                 reply = (
                     "🃏 **ตั้งจิตอธิษฐานให้สงบ**\n"
                     "แล้วเลือกตัวเลขที่ชอบที่สุด\n"
@@ -108,21 +99,29 @@ def handle_text_message(event):
                 )
                 send_reply(event.reply_token, reply)
                 return
-            
-            # ถ้าพิมพ์เลขมาด้วย เช่น "ไพ่ 5"
-            num_part = raw_text.replace("ไพ่", "").strip()
-            if num_part.isdigit():
+            elif num_part.isdigit():  # พิมพ์ "ไพ่ 7"
                 response = get_tarot_reading_by_number(int(num_part))
                 send_reply(event.reply_token, response)
                 return
 
-        # ดักจับคำว่า "เลือก" กรณีผู้ใช้พิมพ์ตามคำแนะนำ
+        # --- หมวด "เลือก" (จากเมนูไพ่) ---
         elif raw_text.startswith("เลือก"):
             num_part = raw_text.replace("เลือก", "").strip()
             if num_part.isdigit():
                 response = get_tarot_reading_by_number(int(num_part))
                 send_reply(event.reply_token, response)
                 return
+
+        # 3. หมวดหมู่ที่ต้องประมวลผล "วันที่"
+        mode = "general"
+        clean_date = raw_text
+
+        if raw_text.startswith("ดวง") or user_text_lower.startswith("today"):
+            mode = "daily"
+            clean_date = raw_text.replace("ดวง", "").replace("today", "").replace("Today", "").strip()
+        elif raw_text.startswith("ซาจู") or user_text_lower.startswith("saju"):
+            mode = "saju"
+            clean_date = raw_text.replace("ซาจู", "").replace("saju", "").replace("Saju", "").strip()
         elif raw_text.startswith("รัก") or user_text_lower.startswith("love"):
             mode = "love"
             clean_date = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
@@ -130,17 +129,14 @@ def handle_text_message(event):
             mode = "chinese"
             clean_date = raw_text.replace("จีน", "").replace("chinese", "").replace("Chinese", "").strip()
 
-        # 3. ประมวลผลวันที่
+        # ประมวลผลวันที่จากข้อความที่เหลือ
         birth_date = parse_date(clean_date)
-        print(f"🔍 Mode: {mode} | Date: '{clean_date}' | Parsed: {birth_date}")
-
+        
         if birth_date:
             if mode == "daily":
                 response = get_daily_horoscope(birth_date)
             elif mode == "saju":
                 response = get_saju_reading(birth_date)
-            elif mode == "tarot":
-                response = get_tarot_reading(birth_date)
             elif mode == "love":
                 response = format_love_reading(birth_date)
             elif mode == "chinese":
@@ -150,10 +146,12 @@ def handle_text_message(event):
             
             send_reply(event.reply_token, response)
         else:
+            # ถ้าพิมพ์อะไรมาไม่รู้และไม่ใช่รูปแบบวันที่
             if mode != "general":
                 send_reply(event.reply_token, f"❌ รูปแบบวันที่ '{clean_date}' ไม่ถูกต้องครับ\nตัวอย่าง: {mode} 10/06/1973")
-            else:
-                send_reply(event.reply_token, "🤔 ไม่เข้าใจคำสั่งครับ พิมพ์ 'วิธีใช้' เพื่อดูเมนู")
+            # ถ้าเป็นข้อความทั่วไป บอทจะไม่ตอบเพื่อป้องกันการสแปม หรือเปิดใช้บรรทัดล่างเพื่อตอบกลับ
+            # else:
+            #    send_reply(event.reply_token, "🤔 ไม่เข้าใจคำสั่งครับ พิมพ์ 'วิธีใช้' เพื่อดูเมนู")
 
     except Exception as e:
         print(f"❌ Error: {e}")
