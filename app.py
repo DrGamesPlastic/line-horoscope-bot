@@ -19,7 +19,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 # ─── Import Logics ───
 from horoscope import format_horoscope, parse_date
-from tarot import get_tarot_reading
+from tarot import get_tarot_reading_by_number
 from love import format_love_reading
 from chinese_full import format_full_chinese_horoscope
 from daily import get_daily_horoscope
@@ -95,7 +95,34 @@ def handle_text_message(event):
             clean_date = raw_text.replace("ซาจู", "").replace("saju", "").replace("Saju", "").strip()
         elif raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
             mode = "tarot"
-            clean_date = raw_text.replace("ไพ่", "").replace("tarot", "").replace("Tarot", "").strip()
+          elif raw_text.startswith("ไพ่") or user_text_lower.startswith("tarot"):
+            # ถ้าพิมพ์แค่ "ไพ่" ให้ส่งเมนูเลือกเลข
+            if len(raw_text) <= 4: 
+                reply = (
+                    "🃏 **ตั้งจิตอธิษฐานให้สงบ**\n"
+                    "แล้วเลือกตัวเลขที่ชอบที่สุด\n"
+                    "จาก **1 ถึง 78**\n\n"
+                    "📥 **พิมพ์ตอบกลับมาว่า:**\n"
+                    "เลือก [หมายเลข]\n"
+                    "(ตัวอย่าง: เลือก 77)"
+                )
+                send_reply(event.reply_token, reply)
+                return
+            
+            # ถ้าพิมพ์เลขมาด้วย เช่น "ไพ่ 5"
+            num_part = raw_text.replace("ไพ่", "").strip()
+            if num_part.isdigit():
+                response = get_tarot_reading_by_number(int(num_part))
+                send_reply(event.reply_token, response)
+                return
+
+        # ดักจับคำว่า "เลือก" กรณีผู้ใช้พิมพ์ตามคำแนะนำ
+        elif raw_text.startswith("เลือก"):
+            num_part = raw_text.replace("เลือก", "").strip()
+            if num_part.isdigit():
+                response = get_tarot_reading_by_number(int(num_part))
+                send_reply(event.reply_token, response)
+                return
         elif raw_text.startswith("รัก") or user_text_lower.startswith("love"):
             mode = "love"
             clean_date = raw_text.replace("รัก", "").replace("love", "").replace("Love", "").strip()
